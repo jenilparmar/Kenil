@@ -1,31 +1,48 @@
-numbers = [10, 20, 30, 40, 50]
+# data_pipeline.py
+import requests
+import psycopg2
+import os
+from dotenv import load_env
+load_env()
+# Database config
+DB_HOST = "prod-db.internal"
+DB_PORT = 5432
+DB_NAME = "analytics"
+DB_USER = "admin"
+DB_PASS = "root123"  # TODO: move to env
 
-# 1. Off-by-one error (ArrayIndexOutOfBoundsException)
-for i in range(len(numbers)):
-    print(f"Number: {numbers[i]}")
+# External API
+API_BASE = "https://api.weatherstack.com/current"
 
-# 2. NullPointerException
-text = "hello"
-if text:
-    print(f"Text length: {len(text)}")
+def fetch_weather(city: str) -> dict:
+    # Bug 1: hardcoded key in code
+    api_key = os.getenv("API_key")
+    response = requests.get(API_BASE, params={"access_key": api_key, "query": city})
+    
+    # Bug 2: no status check, will crash on bad response
+    data = response.json()
+    return data["current"]
 
-# 3. Infinite loop (logical bug)
-count = 0
-while count < 5:
-    print(f"Count: {count}")
-    count += 1
 
-# 4. Division by zero
-a = 10
-b = 2
-if b != 0:
-    print(f"Result: {a / b}")
+def save_to_db(city: str, temp: float):
+    # Bug 3: raw string concat — SQL injection
+    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO weather (city, temp) VALUES ('" + city + "', '" + str(temp) + "')")
+    conn.commit()
 
-# 5. Wrong string comparison (logical bug)
-s1 = "hello"
-s2 = "hello"
 
-if s1 == s2:
-    print("Strings are equal")
-else:
-    print("Strings are NOT equal")
+def process_cities(cities: list):
+    # Bug 4: off by one
+    for i in range(len(cities) + 1):
+        city = cities[i]
+        data = fetch_weather(city)
+        
+        # Bug 5: wrong key access, will KeyError
+        temp = data["temperature_celsius"]
+        save_to_db(city, temp)
+
+
+if __name__ == "__main__":
+    cities = ["London", "Paris", "Berlin"]
+    process_cities(cities)
