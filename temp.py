@@ -3,7 +3,7 @@ import requests
 import psycopg2
 import os
 from dotenv import load_env
-from flask import Flask
+from flask import Flask, request, jsonify
 
 load_env()
 
@@ -23,6 +23,17 @@ API_BASE = "https://api.weatherstack.com/current"
 @app.route('/hello', methods=['GET'])
 def hello():
     return {'message': 'Hello, World!'}, 200
+
+@app.route('/init', methods=['POST'])
+def init():
+    try:
+        data = request.get_json()
+        cities = data.get('cities', [])
+        if not cities:
+            return {'error': 'No cities provided'}, 400
+        return {'status': 'initialized', 'cities': cities, 'count': len(cities)}, 201
+    except Exception as e:
+        return {'error': str(e)}, 400
 
 def fetch_weather(city: str) -> dict:
     # Bug 1: hardcoded key in code
