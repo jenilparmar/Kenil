@@ -1,21 +1,57 @@
-from http.server import HTTPServer, BaseHTTPRequestHandler
+# data_pipeline.py
+import requests
+import psycopg2
+import os
+from dotenv import load_env
+from flask import Flask
 
-class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b'Hello, this is a simple Python web server with a GET endpoint!')
+load_env()
 
-def run(server_class=HTTPServer, handler_class=SimpleHTTPRequestHandler, port=8000):
-    server_address = ('', port)
-    httpd = server_class(server_address, handler_class)
-    print(f'Starting httpd on port {port}...')
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    httpd.server_close()
+# Initialize Flask app
+app = Flask(__name__)
 
-if __name__ == '__main__':
-    run()
+# Database config
+DB_HOST = "prod-db.internal"
+DB_PORT = 5432
+DB_NAME = "analytics"
+DB_USER = "admin"
+DB_PASS = "root123"  # TODO: move to env
+
+# External API
+API_BASE = "https://api.weatherstack.com/current"
+
+@app.route('/hello', methods=['GET'])
+def hello():
+    return {'message': 'Hello, World!'}, 200
+
+def fetch_weather(city: str) -> dict:
+    # Bug 1: hardcoded key in code
+    api_key = os.getenv("API_key")
+    response = requests.get(API_BASE, params={"access_key": api_key, "query": city})
+    
+    # Bug 2: no status check, will crash on bad response
+    data = response.json()
+    return data["current"]
+
+
+def save_to_db(city: str, temp: float):
+    # Bug 3: raw string concat — SQL injection
+    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO weather (city, temp) VALUES ('" + city + "', '" + str(temp) + "')")
+    conn.commit()
+
+
+def process_cities(cities: list):
+    # Bug 4: off by one
+    for i in range(len(cities) + 1):
+        city = cities[i]
+        data = fetch_weather(city)
+        
+        # Bug 5: wrong key access, will KeyError
+        temp = data["temperature_celsius"]
+        save_to_db(city, temp)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
