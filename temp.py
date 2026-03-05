@@ -7,7 +7,6 @@ from flask import Flask, request, jsonify
 
 load_env()
 
-# Initialize Flask app
 app = Flask(__name__)
 
 # Database config
@@ -19,21 +18,6 @@ DB_PASS = "root123"  # TODO: move to env
 
 # External API
 API_BASE = "https://api.weatherstack.com/current"
-
-@app.route('/hello', methods=['GET'])
-def hello():
-    return {'message': 'Hello, World!'}, 200
-
-@app.route('/init', methods=['POST'])
-def init():
-    try:
-        data = request.get_json()
-        cities = data.get('cities', [])
-        if not cities:
-            return {'error': 'No cities provided'}, 400
-        return {'status': 'initialized', 'cities': cities, 'count': len(cities)}, 201
-    except Exception as e:
-        return {'error': str(e)}, 400
 
 def fetch_weather(city: str) -> dict:
     # Bug 1: hardcoded key in code
@@ -64,5 +48,30 @@ def process_cities(cities: list):
         save_to_db(city, temp)
 
 
+@app.route('/weather/<city>', methods=['PATCH'])
+def update_weather(city: str):
+    """PATCH endpoint to update weather data for a specific city"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'temperature' not in data:
+            return jsonify({"error": "temperature field is required"}), 400
+        
+        temp = data['temperature']
+        
+        # Update database with new temperature
+        conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE weather SET temp = %s WHERE city = %s", (temp, city))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"message": f"Weather updated for {city}", "city": city, "temperature": temp}), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    cities = ["London", "Paris", "Berlin"]
+    process_cities(cities)
