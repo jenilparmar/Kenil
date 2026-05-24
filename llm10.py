@@ -1,1 +1,1 @@
-hello aegis
+print("hello world")
