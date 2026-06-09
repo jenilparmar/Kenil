@@ -1,0 +1,2 @@
+Aegis MCP direct-to-main push test.
+Timestamp: 2026-06-09
