@@ -1,5 +1,6 @@
 name: Main Branch CI
 on:
+  workflow_dispatch:
   push:
     branches:
       - main # This only triggers AFTER a merge, not during the PR.
