@@ -1,12 +1,25 @@
 name: Main Branch CI
+
 on:
   workflow_dispatch:
   push:
     branches:
-      - main # This only triggers AFTER a merge, not during the PR.
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt install
+      - run: echo "Build succeeded"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simulate deployment
+        run: echo "Deploying..."
+
+      - name: Force deployment failure
+        run: |
+          echo "Deployment failed intentionally."
+          exit 1
