@@ -1,0 +1,2 @@
+Hello from Aegis MCP — this is a dummy file.
+Created for testing GitHub tools.
